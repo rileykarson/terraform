@@ -122,7 +122,8 @@ func resourceArmLoadBalancerCreate(d *schema.ResourceData, meta interface{}) err
 		LoadBalancerPropertiesFormat: &properties,
 	}
 
-	_, err := loadBalancerClient.CreateOrUpdate(resGroup, name, loadbalancer, make(chan struct{}))
+	_, error := loadBalancerClient.CreateOrUpdate(resGroup, name, loadbalancer, make(chan struct{}))
+	err := <-error
 	if err != nil {
 		return errwrap.Wrapf("Error Creating/Updating LoadBalancer {{err}}", err)
 	}
@@ -190,7 +191,8 @@ func resourceArmLoadBalancerDelete(d *schema.ResourceData, meta interface{}) err
 	resGroup := id.ResourceGroup
 	name := id.Path["loadBalancers"]
 
-	_, err = loadBalancerClient.Delete(resGroup, name, make(chan struct{}))
+	_, error := loadBalancerClient.Delete(resGroup, name, make(chan struct{}))
+	err = <-error
 	if err != nil {
 		return errwrap.Wrapf("Error Deleting LoadBalancer {{err}}", err)
 	}
