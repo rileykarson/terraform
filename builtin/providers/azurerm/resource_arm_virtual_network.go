@@ -112,7 +112,8 @@ func resourceArmVirtualNetworkCreate(d *schema.ResourceData, meta interface{}) e
 	azureRMVirtualNetworkLockNetworkSecurityGroups(&networkSecurityGroupNames)
 	defer azureRMVirtualNetworkUnlockNetworkSecurityGroups(&networkSecurityGroupNames)
 
-	_, err := vnetClient.CreateOrUpdate(resGroup, name, vnet, make(chan struct{}))
+	_, error := vnetClient.CreateOrUpdate(resGroup, name, vnet, make(chan struct{}))
+	err := <- error
 	if err != nil {
 		return err
 	}
@@ -205,7 +206,8 @@ func resourceArmVirtualNetworkDelete(d *schema.ResourceData, meta interface{}) e
 	azureRMVirtualNetworkLockNetworkSecurityGroups(&nsgNames)
 	defer azureRMVirtualNetworkUnlockNetworkSecurityGroups(&nsgNames)
 
-	_, err = vnetClient.Delete(resGroup, name, make(chan struct{}))
+	_, error := vnetClient.Delete(resGroup, name, make(chan struct{}))
+	err = <-error
 
 	return err
 }
