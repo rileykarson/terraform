@@ -174,7 +174,6 @@ func resourceKubernetesServiceUpdate(d *schema.ResourceData, meta interface{}) e
 	namespace, name := idParts(d.Id())
 
 	ops := patchMetadata("metadata.0.", "/metadata/", d)
-	// TODO
 	if d.HasChange("spec") {
 		diffOps := patchServiceSpec("spec.0.", "/spec/", d)
 		ops = append(ops, diffOps...)

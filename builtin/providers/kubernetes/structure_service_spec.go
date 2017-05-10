@@ -168,10 +168,15 @@ func patchServiceSpec(keyPrefix, pathPrefix string, d *schema.ResourceData) Patc
 		})
 	}
 	if d.HasChange(keyPrefix + "port") {
-		ops = append(ops, &ReplaceOperation{
-			Path:  pathPrefix + "ports",
-			Value: expandServicePort(d.Get("port").(*schema.Set).List()),
-		})
+		v, ok := d.Get("port").(*schema.Set)
+		if ok {
+			ops = append(ops, &ReplaceOperation{
+				Path:  pathPrefix + "ports",
+				Value: expandServicePort(v.List()),
+			})
+		} else {
+			log.Printf("[DEBUG] Damn: %#v", d.Get("port"))
+		}
 	}
 	if d.HasChange(keyPrefix + "external_ips") {
 		ops = append(ops, &ReplaceOperation{
