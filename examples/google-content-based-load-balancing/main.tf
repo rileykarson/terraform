@@ -130,6 +130,11 @@ resource "google_compute_url_map" "web-map" {
       paths = ["/video", "/video/*",]
       service = "${google_compute_backend_service.video-service.self_link}"
     }
+
+    path_rule {
+      paths = ["/static", "/static/*",]
+      service = "${google_compute_backend_bucket.backend-bucket.self_link}"
+    }
   }
 }
 
@@ -156,4 +161,31 @@ resource "google_compute_firewall" "default" {
 
   source_ranges = ["130.211.0.0/22", "35.191.0.0/16"]
   target_tags = ["http-tag"]
+}
+
+resource "google_storage_bucket" "static-bucket" {
+  name = "tf-static-bucket"
+  storage_class = "MULTI_REGIONAL"
+  location = "US"
+
+}
+
+resource "google_storage_bucket_object" "static-object" {
+  name   = "static/object"
+  source = "objects/object.html"
+  bucket = "${google_storage_bucket.static-bucket.name}"
+}
+
+resource "google_storage_object_acl" "image-store-acl" {
+  bucket = "${google_storage_bucket.static-bucket.name}"
+  object = "${google_storage_bucket_object.static-object.name}"
+
+  role_entity = [
+    "READER:allUsers",
+  ]
+}
+
+resource "google_compute_backend_bucket" "backend-bucket" {
+  name        = "tf-backend-bucket"
+  bucket_name = "${google_storage_bucket.static-bucket.name}"
 }

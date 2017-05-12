@@ -1,7 +1,8 @@
 # Content Based Load Balancing in Google Cloud
 
 This provides a template for running an HTTP load balancer that distributes traffic to different instances based on the
-path in the request URL. It is based on the tutorial at [https://cloud.google.com/compute/docs/load-balancing/http/content-based-example](https://cloud.google.com/compute/docs/load-balancing/http/content-based-example).
+path in the request URL. It is based on the tutorial at [https://cloud.google.com/compute/docs/load-balancing/http/content-based-example](https://cloud.google.com/compute/docs/load-balancing/http/content-based-example),
+as well as the extension to the tutorial at [https://cloud.google.com/compute/docs/load-balancing/http/adding-a-backend-bucket-to-content-based-load-balancing](https://cloud.google.com/compute/docs/load-balancing/http/adding-a-backend-bucket-to-content-based-load-balancing).
 
 You will need to generate SSH keys as follows:
 
@@ -22,9 +23,14 @@ After your instance registers, the LB should respond with the following at its r
 <h1>www</h1>
 ```
 
-And the following at the /video/ url:
+With the following at the /video/ url:
 ```html
 <h1>www-video</h1>
+```
+
+and with the following at the /static/object url:
+```html
+<h1>static object</h1>
 ```
 
 To run, configure your Google Cloud provider as described in
