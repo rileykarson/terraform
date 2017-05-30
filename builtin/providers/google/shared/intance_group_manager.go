@@ -1,6 +1,7 @@
 package shared
 
 import (
+	computeBeta "google.golang.org/api/compute/v0.beta"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 )
@@ -144,6 +145,62 @@ func InstanceGroupManagerFromProduction(s *compute.InstanceGroupManager) *Instan
 		Kind:              s.Kind,
 		Name:              s.Name,
 		NamedPorts:        NamedPortsFromProduction(s.NamedPorts),
+		Region:            s.Region,
+		SelfLink:          s.SelfLink,
+		TargetPools:       s.TargetPools,
+		TargetSize:        s.TargetSize,
+		Zone:              s.Zone,
+		ServerResponse:    s.ServerResponse,
+		ForceSendFields:   s.ForceSendFields,
+		NullFields:        s.NullFields,
+	}
+}
+
+func (s *InstanceGroupManager) ToBeta() *computeBeta.InstanceGroupManager {
+	if s == nil {
+		return nil
+	}
+
+	return &computeBeta.InstanceGroupManager{
+		BaseInstanceName:  s.BaseInstanceName,
+		CreationTimestamp: s.CreationTimestamp,
+		CurrentActions:    s.CurrentActions.ToBeta(),
+		Description:       s.Description,
+		Fingerprint:       s.Fingerprint,
+		Id:                s.Id,
+		InstanceGroup:     s.InstanceGroup,
+		InstanceTemplate:  s.InstanceTemplate,
+		Kind:              s.Kind,
+		Name:              s.Name,
+		NamedPorts:        NamedPortsToBeta(s.NamedPorts),
+		Region:            s.Region,
+		SelfLink:          s.SelfLink,
+		TargetPools:       s.TargetPools,
+		TargetSize:        s.TargetSize,
+		Zone:              s.Zone,
+		ServerResponse:    s.ServerResponse,
+		ForceSendFields:   s.ForceSendFields,
+		NullFields:        s.NullFields,
+	}
+}
+
+func InstanceGroupManagerFromBeta(s *computeBeta.InstanceGroupManager) *InstanceGroupManager {
+	if s == nil {
+		return nil
+	}
+
+	return &InstanceGroupManager{
+		BaseInstanceName:  s.BaseInstanceName,
+		CreationTimestamp: s.CreationTimestamp,
+		CurrentActions:    InstanceGroupManagerActionsSummaryFromBeta(s.CurrentActions),
+		Description:       s.Description,
+		Fingerprint:       s.Fingerprint,
+		Id:                s.Id,
+		InstanceGroup:     s.InstanceGroup,
+		InstanceTemplate:  s.InstanceTemplate,
+		Kind:              s.Kind,
+		Name:              s.Name,
+		NamedPorts:        NamedPortsFromBeta(s.NamedPorts),
 		Region:            s.Region,
 		SelfLink:          s.SelfLink,
 		TargetPools:       s.TargetPools,

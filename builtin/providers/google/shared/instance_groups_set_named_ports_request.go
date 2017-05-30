@@ -1,6 +1,9 @@
 package shared
 
-import "google.golang.org/api/compute/v1"
+import (
+	computeBeta "google.golang.org/api/compute/v0.beta"
+	"google.golang.org/api/compute/v1"
+)
 
 type InstanceGroupsSetNamedPortsRequest struct {
 	// Fingerprint: The fingerprint of the named ports information for this
@@ -52,6 +55,32 @@ func InstanceGroupsSetNamedPortsRequestFromProduction(s *compute.InstanceGroupsS
 	return &InstanceGroupsSetNamedPortsRequest{
 		Fingerprint:     s.Fingerprint,
 		NamedPorts:      NamedPortsFromProduction(s.NamedPorts),
+		ForceSendFields: s.ForceSendFields,
+		NullFields:      s.NullFields,
+	}
+}
+
+func (s *InstanceGroupsSetNamedPortsRequest) ToBeta() *computeBeta.InstanceGroupsSetNamedPortsRequest {
+	if s == nil {
+		return nil
+	}
+
+	return &computeBeta.InstanceGroupsSetNamedPortsRequest{
+		Fingerprint:     s.Fingerprint,
+		NamedPorts:      NamedPortsToBeta(s.NamedPorts),
+		ForceSendFields: s.ForceSendFields,
+		NullFields:      s.NullFields,
+	}
+}
+
+func InstanceGroupsSetNamedPortsRequestFromBeta(s *computeBeta.InstanceGroupsSetNamedPortsRequest) *InstanceGroupsSetNamedPortsRequest {
+	if s == nil {
+		return nil
+	}
+
+	return &InstanceGroupsSetNamedPortsRequest{
+		Fingerprint:     s.Fingerprint,
+		NamedPorts:      NamedPortsFromBeta(s.NamedPorts),
 		ForceSendFields: s.ForceSendFields,
 		NullFields:      s.NullFields,
 	}

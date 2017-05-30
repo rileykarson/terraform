@@ -1,6 +1,7 @@
 package shared
 
 import (
+	computeBeta "google.golang.org/api/compute/v0.beta"
 	"google.golang.org/api/compute/v1"
 )
 
@@ -82,6 +83,24 @@ func (s *InstanceGroupManagerActionsSummary) ToProduction() *compute.InstanceGro
 }
 
 func InstanceGroupManagerActionsSummaryFromProduction(s *compute.InstanceGroupManagerActionsSummary) *InstanceGroupManagerActionsSummary {
+	if s == nil {
+		return nil
+	}
+
+	n := InstanceGroupManagerActionsSummary(*s)
+	return &n
+}
+
+func (s *InstanceGroupManagerActionsSummary) ToBeta() *computeBeta.InstanceGroupManagerActionsSummary {
+	if s == nil {
+		return nil
+	}
+
+	n := computeBeta.InstanceGroupManagerActionsSummary(*s)
+	return &n
+}
+
+func InstanceGroupManagerActionsSummaryFromBeta(s *computeBeta.InstanceGroupManagerActionsSummary) *InstanceGroupManagerActionsSummary {
 	if s == nil {
 		return nil
 	}

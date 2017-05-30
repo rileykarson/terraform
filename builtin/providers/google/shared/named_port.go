@@ -1,6 +1,7 @@
 package shared
 
 import (
+	computeBeta "google.golang.org/api/compute/v0.beta"
 	"google.golang.org/api/compute/v1"
 )
 
@@ -60,6 +61,40 @@ func NamedPortsFromProduction(namedPorts []*compute.NamedPort) []*NamedPort {
 	arr := make([]*NamedPort, 0, len(namedPorts))
 	for _, v := range namedPorts {
 		arr = append(arr, NamedPortFromProduction(v))
+	}
+	return arr
+}
+
+func (s *NamedPort) ToBeta() *computeBeta.NamedPort {
+	if s == nil {
+		return nil
+	}
+
+	n := computeBeta.NamedPort(*s)
+	return &n
+}
+
+func NamedPortFromBeta(s *computeBeta.NamedPort) *NamedPort {
+	if s == nil {
+		return nil
+	}
+
+	n := NamedPort(*s)
+	return &n
+}
+
+func NamedPortsToBeta(namedPorts []*NamedPort) []*computeBeta.NamedPort {
+	arr := make([]*computeBeta.NamedPort, 0, len(namedPorts))
+	for _, v := range namedPorts {
+		arr = append(arr, v.ToBeta())
+	}
+	return arr
+}
+
+func NamedPortsFromBeta(namedPorts []*computeBeta.NamedPort) []*NamedPort {
+	arr := make([]*NamedPort, 0, len(namedPorts))
+	for _, v := range namedPorts {
+		arr = append(arr, NamedPortFromBeta(v))
 	}
 	return arr
 }

@@ -1,6 +1,7 @@
 package shared
 
 import (
+	computeBeta "google.golang.org/api/compute/v0.beta"
 	"google.golang.org/api/compute/v1"
 )
 
@@ -47,6 +48,24 @@ func (s *InstanceGroupManagersSetTargetPoolsRequest) ToProduction() *compute.Ins
 }
 
 func InstanceGroupManagersSetTargetPoolsRequestFromProduction(s *compute.InstanceGroupManagersSetTargetPoolsRequest) *InstanceGroupManagersSetTargetPoolsRequest {
+	if s == nil {
+		return nil
+	}
+
+	n := InstanceGroupManagersSetTargetPoolsRequest(*s)
+	return &n
+}
+
+func (s *InstanceGroupManagersSetTargetPoolsRequest) ToBeta() *computeBeta.InstanceGroupManagersSetTargetPoolsRequest {
+	if s == nil {
+		return nil
+	}
+
+	n := computeBeta.InstanceGroupManagersSetTargetPoolsRequest(*s)
+	return &n
+}
+
+func InstanceGroupManagersSetTargetPoolsRequestFromBeta(s *computeBeta.InstanceGroupManagersSetTargetPoolsRequest) *InstanceGroupManagersSetTargetPoolsRequest {
 	if s == nil {
 		return nil
 	}

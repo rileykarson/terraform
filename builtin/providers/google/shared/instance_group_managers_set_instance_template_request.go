@@ -1,6 +1,9 @@
 package shared
 
-import "google.golang.org/api/compute/v1"
+import (
+	computeBeta "google.golang.org/api/compute/v0.beta"
+	"google.golang.org/api/compute/v1"
+)
 
 type InstanceGroupManagersSetInstanceTemplateRequest struct {
 	// InstanceTemplate: The URL of the instance template that is specified
@@ -36,6 +39,24 @@ func (s *InstanceGroupManagersSetInstanceTemplateRequest) ToProduction() *comput
 }
 
 func InstanceGroupManagersSetInstanceTemplateRequestFromProduction(s *compute.InstanceGroupManagersSetInstanceTemplateRequest) *InstanceGroupManagersSetInstanceTemplateRequest {
+	if s == nil {
+		return nil
+	}
+
+	n := InstanceGroupManagersSetInstanceTemplateRequest(*s)
+	return &n
+}
+
+func (s *InstanceGroupManagersSetInstanceTemplateRequest) ToBeta() *computeBeta.InstanceGroupManagersSetInstanceTemplateRequest {
+	if s == nil {
+		return nil
+	}
+
+	n := computeBeta.InstanceGroupManagersSetInstanceTemplateRequest(*s)
+	return &n
+}
+
+func InstanceGroupManagersSetInstanceTemplateRequestFromBeta(s *computeBeta.InstanceGroupManagersSetInstanceTemplateRequest) *InstanceGroupManagersSetInstanceTemplateRequest {
 	if s == nil {
 		return nil
 	}
