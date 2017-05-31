@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform/helper/acctest"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
+	"strings"
 )
 
 func TestAccInstanceGroupManagerBeta_basic(t *testing.T) {
@@ -156,6 +157,43 @@ func TestAccInstanceGroupManagerBeta_separateRegions(t *testing.T) {
 			},
 		},
 	})
+}
+
+func TestAccInstanceGroupManagerBeta_autoHealingPolicies(t *testing.T) {
+	var manager computeBeta.InstanceGroupManager
+
+	template := fmt.Sprintf("igm-test-%s", acctest.RandString(10))
+	target := fmt.Sprintf("igm-test-%s", acctest.RandString(10))
+	igm := fmt.Sprintf("igm-test-%s", acctest.RandString(10))
+	hck := fmt.Sprintf("igm-test-%s", acctest.RandString(10))
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckInstanceGroupManagerBetaDestroy,
+		Steps: []resource.TestStep{
+			resource.TestStep{
+				Config: testAccInstanceGroupManagerBeta_autoHealingPolicies(template, target, igm, hck),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckInstanceGroupManagerBetaExists(
+						"google_compute_beta_instance_group_manager.igm-basic", &manager),
+				),
+			},
+		},
+	})
+
+	if len(manager.AutoHealingPolicies) != 1 {
+		t.Errorf("Expected # of auto healing policies to be 1, got %d", len(manager.AutoHealingPolicies))
+	}
+	autoHealingPolicy := manager.AutoHealingPolicies[0]
+
+	if !strings.Contains(autoHealingPolicy.HealthCheck, hck) {
+		t.Errorf("Expected string \"%s\" to appear in \"%s\"", hck, autoHealingPolicy.HealthCheck)
+	}
+
+	if autoHealingPolicy.InitialDelaySec != 10 {
+		t.Errorf("Expected auto healing policy inital delay to be 10, got %d", autoHealingPolicy.InitialDelaySec)
+	}
 }
 
 func testAccCheckInstanceGroupManagerBetaDestroy(s *terraform.State) error {
@@ -638,4 +676,60 @@ func testAccInstanceGroupManagerBeta_separateRegions(igm1, igm2 string) string {
 		target_size = 2
 	}
 	`, igm1, igm2)
+}
+
+func testAccInstanceGroupManagerBeta_autoHealingPolicies(template, target, igm, hck string) string {
+	return fmt.Sprintf(`
+	resource "google_compute_instance_template" "igm-basic" {
+		name = "%s"
+		machine_type = "n1-standard-1"
+		can_ip_forward = false
+		tags = ["foo", "bar"]
+
+		disk {
+			source_image = "debian-cloud/debian-8-jessie-v20160803"
+			auto_delete = true
+			boot = true
+		}
+
+		network_interface {
+			network = "default"
+		}
+
+		metadata {
+			foo = "bar"
+		}
+
+		service_account {
+			scopes = ["userinfo-email", "compute-ro", "storage-ro"]
+		}
+	}
+
+	resource "google_compute_target_pool" "igm-basic" {
+		description = "Resource created for Terraform acceptance testing"
+		name = "%s"
+		session_affinity = "CLIENT_IP_PROTO"
+	}
+
+	resource "google_compute_beta_instance_group_manager" "igm-basic" {
+		description = "Terraform test instance group manager"
+		name = "%s"
+		instance_template = "${google_compute_instance_template.igm-basic.self_link}"
+		target_pools = ["${google_compute_target_pool.igm-basic.self_link}"]
+		base_instance_name = "igm-basic"
+		zone = "us-central1-c"
+		target_size = 2
+		auto_healing_policies {
+			health_check = "${google_compute_http_health_check.zero.self_link}"
+			initial_delay_sec = "10"
+		}
+	}
+
+	resource "google_compute_http_health_check" "zero" {
+	  name               = "%s"
+	  request_path       = "/"
+	  check_interval_sec = 1
+	  timeout_sec        = 1
+	}
+	`, template, target, igm, hck)
 }

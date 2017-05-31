@@ -119,6 +119,42 @@ func resourceComputeInstanceGroupManager(apiLevel ApiLevel) *schema.Resource {
 		},
 	}
 
+	if apiLevel == BETA {
+		s.Schema["auto_healing_policies"] = &schema.Schema{
+			Type:     schema.TypeList,
+			Optional: true,
+			MaxItems: 1,
+			Elem: &schema.Resource{
+				Schema: map[string]*schema.Schema{
+					"health_check": &schema.Schema{
+						Type:             schema.TypeString,
+						Required:         true,
+						DiffSuppressFunc: self_link_relative_path_comparator,
+					},
+
+					"initial_delay_sec": &schema.Schema{
+						Type:     schema.TypeInt,
+						Required: true,
+						ValidateFunc: func(v interface{}, k string) (ws []string, errors []error) {
+							min := 0
+							max := 3600
+							value := v.(int)
+							if value < min {
+								errors = append(errors, fmt.Errorf(
+									"%q cannot be lower than %d: %d", k, min, value))
+							}
+							if value > max {
+								errors = append(errors, fmt.Errorf(
+									"%q cannot be higher than %d: %d", k, max, value))
+							}
+							return
+						},
+					},
+				},
+			},
+		}
+	}
+
 	return s
 }
 
@@ -187,8 +223,14 @@ func resourceComputeInstanceGroupManagerCreate(apiLevel ApiLevel) func(d *schema
 			op, err = config.clientCompute.InstanceGroupManagers.Insert(
 				project, d.Get("zone").(string), manager.ToProduction()).Do()
 		case BETA:
+			betaManager := manager.ToBeta()
+
+			if v, ok := d.GetOk("auto_healing_policies"); ok {
+				betaManager.AutoHealingPolicies = expandAutoHealingPolicies(v.([]interface{}))
+			}
+
 			op, err = config.clientComputeBeta.InstanceGroupManagers.Insert(
-				project, d.Get("zone").(string), manager.ToBeta()).Do()
+				project, d.Get("zone").(string), betaManager).Do()
 		}
 
 		if err != nil {
@@ -305,6 +347,8 @@ func resourceComputeInstanceGroupManagerRead(apiLevel ApiLevel) func(d *schema.R
 				d.SetId("")
 				return nil
 			}
+
+			d.Set("auto_healing_policies", flattenAutoHealingPolicies(betaManager.AutoHealingPolicies))
 
 			manager = shared.InstanceGroupManagerFromBeta(betaManager)
 		}
@@ -531,6 +575,32 @@ func resourceComputeInstanceGroupManagerUpdate(apiLevel ApiLevel) func(d *schema
 
 			d.SetPartial("target_size")
 		}
+
+		// If in Beta, check AutoHealingPolicies.
+		if level == BETA {
+			if d.HasChange("auto_healing_policies") {
+				setAutoHealingPoliciesRequest := &computeBeta.InstanceGroupManagersSetAutoHealingRequest{}
+				if v, ok := d.GetOk("auto_healing_policies"); ok {
+					setAutoHealingPoliciesRequest.AutoHealingPolicies = expandAutoHealingPolicies(v.([]interface{}))
+				}
+
+				op, err := config.clientComputeBeta.InstanceGroupManagers.SetAutoHealingPolicies(
+					project, d.Get("zone").(string), d.Id(), setAutoHealingPoliciesRequest).Do()
+
+				if err != nil {
+					return fmt.Errorf("Error updating AutoHealingPolicies: %s", err)
+				}
+
+				// Wait for the operation to complete
+				err = computeSharedOperationWaitZone(config, op, project, d.Get("zone").(string), "Updating AutoHealingPolicies")
+				if err != nil {
+					return err
+				}
+
+				d.SetPartial("auto_healing_policies")
+			}
+		}
+
 		d.Partial(false)
 
 		return resourceComputeInstanceGroupManagerRead(level)(d, meta)
@@ -615,6 +685,33 @@ func resourceComputeInstanceGroupManagerDelete(apiLevel ApiLevel) func(d *schema
 		d.SetId("")
 		return nil
 	}
+}
+
+func expandAutoHealingPolicies(configured []interface{}) []*computeBeta.InstanceGroupManagerAutoHealingPolicy {
+	autoHealingPolicies := make([]*computeBeta.InstanceGroupManagerAutoHealingPolicy, 0, len(configured))
+	for _, raw := range configured {
+		data := raw.(map[string]interface{})
+		autoHealingPolicy := computeBeta.InstanceGroupManagerAutoHealingPolicy{
+			HealthCheck:     data["health_check"].(string),
+			InitialDelaySec: int64(data["initial_delay_sec"].(int)),
+		}
+
+		autoHealingPolicies = append(autoHealingPolicies, &autoHealingPolicy)
+	}
+	return autoHealingPolicies
+}
+
+func flattenAutoHealingPolicies(autoHealingPolicies []*computeBeta.InstanceGroupManagerAutoHealingPolicy) []map[string]interface{} {
+	autoHealingPoliciesSchema := make([]map[string]interface{}, 0, len(autoHealingPolicies))
+	for _, autoHealingPolicy := range autoHealingPolicies {
+		data := map[string]interface{}{
+			"health_check":      autoHealingPolicy.HealthCheck,
+			"initial_delay_sec": autoHealingPolicy.InitialDelaySec,
+		}
+
+		autoHealingPoliciesSchema = append(autoHealingPoliciesSchema, data)
+	}
+	return autoHealingPoliciesSchema
 }
 
 func getZonalResourceFromRegion(getResource func(string) (interface{}, error), region string, compute *compute.Service, project string) (interface{}, error) {
