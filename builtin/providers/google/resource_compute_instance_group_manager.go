@@ -9,7 +9,9 @@ import (
 	"github.com/hashicorp/terraform/builtin/providers/google/shared"
 	"github.com/hashicorp/terraform/helper/schema"
 
+	computeBeta "google.golang.org/api/compute/v0.beta"
 	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
 )
 
 func resourceComputeInstanceGroupManager(apiLevel ApiLevel) *schema.Resource {
@@ -30,8 +32,9 @@ func resourceComputeInstanceGroupManager(apiLevel ApiLevel) *schema.Resource {
 			},
 
 			"instance_template": &schema.Schema{
-				Type:     schema.TypeString,
-				Required: true,
+				Type:             schema.TypeString,
+				Required:         true,
+				DiffSuppressFunc: self_link_relative_path_comparator,
 			},
 
 			"name": &schema.Schema{
@@ -101,8 +104,11 @@ func resourceComputeInstanceGroupManager(apiLevel ApiLevel) *schema.Resource {
 			"target_pools": &schema.Schema{
 				Type:     schema.TypeSet,
 				Optional: true,
-				Elem:     &schema.Schema{Type: schema.TypeString},
-				Set:      schema.HashString,
+				Elem: &schema.Schema{
+					Type:             schema.TypeString,
+					DiffSuppressFunc: self_link_relative_path_comparator,
+				},
+				Set: self_link_relative_path_hash,
 			},
 
 			"target_size": &schema.Schema{
@@ -180,6 +186,9 @@ func resourceComputeInstanceGroupManagerCreate(apiLevel ApiLevel) func(d *schema
 		case PRODUCTION:
 			op, err = config.clientCompute.InstanceGroupManagers.Insert(
 				project, d.Get("zone").(string), manager.ToProduction()).Do()
+		case BETA:
+			op, err = config.clientComputeBeta.InstanceGroupManagers.Insert(
+				project, d.Get("zone").(string), manager.ToBeta()).Do()
 		}
 
 		if err != nil {
@@ -263,6 +272,41 @@ func resourceComputeInstanceGroupManagerRead(apiLevel ApiLevel) func(d *schema.R
 			}
 
 			manager = shared.InstanceGroupManagerFromProduction(productionManager)
+		case BETA:
+			getInstanceGroupManager := func(zone string) (interface{}, error) {
+				return config.clientComputeBeta.InstanceGroupManagers.Get(project, zone, d.Id()).Do()
+			}
+
+			var betaManager *computeBeta.InstanceGroupManager
+			var e error
+			if zone, ok := d.GetOk("zone"); ok {
+				betaManager, e = config.clientComputeBeta.InstanceGroupManagers.Get(project, zone.(string), d.Id()).Do()
+
+				if e != nil {
+					return handleNotFoundError(e, d, fmt.Sprintf("Instance Group Manager %q", d.Get("name").(string)))
+				}
+			} else {
+				// If the resource was imported, the only info we have is the ID. Try to find the resource
+				// by searching in the region of the project.
+				var resource interface{}
+				resource, e = getZonalBetaResourceFromRegion(getInstanceGroupManager, region, config.clientComputeBeta, project)
+
+				if e != nil {
+					return e
+				}
+
+				betaManager = resource.(*computeBeta.InstanceGroupManager)
+			}
+
+			if betaManager == nil {
+				log.Printf("[WARN] Removing Instance Group Manager %q because it's gone", d.Get("name").(string))
+
+				// The resource doesn't exist anymore
+				d.SetId("")
+				return nil
+			}
+
+			manager = shared.InstanceGroupManagerFromBeta(betaManager)
 		}
 
 		zoneUrl := strings.Split(manager.Zone, "/")
@@ -320,6 +364,9 @@ func resourceComputeInstanceGroupManagerUpdate(apiLevel ApiLevel) func(d *schema
 			case PRODUCTION:
 				op, err = config.clientCompute.InstanceGroupManagers.SetTargetPools(
 					project, d.Get("zone").(string), d.Id(), setTargetPools.ToProduction()).Do()
+			case BETA:
+				op, err = config.clientComputeBeta.InstanceGroupManagers.SetTargetPools(
+					project, d.Get("zone").(string), d.Id(), setTargetPools.ToBeta()).Do()
 
 			}
 
@@ -348,6 +395,9 @@ func resourceComputeInstanceGroupManagerUpdate(apiLevel ApiLevel) func(d *schema
 			case PRODUCTION:
 				op, err = config.clientCompute.InstanceGroupManagers.SetInstanceTemplate(
 					project, d.Get("zone").(string), d.Id(), setInstanceTemplate.ToProduction()).Do()
+			case BETA:
+				op, err = config.clientComputeBeta.InstanceGroupManagers.SetInstanceTemplate(
+					project, d.Get("zone").(string), d.Id(), setInstanceTemplate.ToBeta()).Do()
 			}
 
 			if err != nil {
@@ -385,6 +435,26 @@ func resourceComputeInstanceGroupManagerUpdate(apiLevel ApiLevel) func(d *schema
 					if err != nil {
 						return fmt.Errorf("Error restarting instance group managers instances: %s", err)
 					}
+				case BETA:
+					managedInstances, err := config.clientComputeBeta.InstanceGroupManagers.ListManagedInstances(
+						project, d.Get("zone").(string), d.Id()).Do()
+
+					managedInstanceCount = len(managedInstances.ManagedInstances)
+					instances := make([]string, managedInstanceCount)
+					for i, v := range managedInstances.ManagedInstances {
+						instances[i] = v.Instance
+					}
+
+					recreateInstances := &computeBeta.InstanceGroupManagersRecreateInstancesRequest{
+						Instances: instances,
+					}
+
+					op, err = config.clientComputeBeta.InstanceGroupManagers.RecreateInstances(
+						project, d.Get("zone").(string), d.Id(), recreateInstances).Do()
+
+					if err != nil {
+						return fmt.Errorf("Error restarting instance group managers instances: %s", err)
+					}
 				}
 
 				// Wait for the operation to complete
@@ -407,12 +477,16 @@ func resourceComputeInstanceGroupManagerUpdate(apiLevel ApiLevel) func(d *schema
 				NamedPorts: namedPorts,
 			}
 
+			// Make the request:
 			var op interface{}
 			switch level {
 			case PRODUCTION:
-				// Make the request:
 				op, err = config.clientCompute.InstanceGroups.SetNamedPorts(
 					project, d.Get("zone").(string), d.Id(), setNamedPorts.ToProduction()).Do()
+			case BETA:
+
+				op, err = config.clientComputeBeta.InstanceGroups.SetNamedPorts(
+					project, d.Get("zone").(string), d.Id(), setNamedPorts.ToBeta()).Do()
 			}
 
 			if err != nil {
@@ -438,6 +512,9 @@ func resourceComputeInstanceGroupManagerUpdate(apiLevel ApiLevel) func(d *schema
 				switch level {
 				case PRODUCTION:
 					op, err = config.clientCompute.InstanceGroupManagers.Resize(
+						project, d.Get("zone").(string), d.Id(), target_size).Do()
+				case BETA:
+					op, err = config.clientComputeBeta.InstanceGroupManagers.Resize(
 						project, d.Get("zone").(string), d.Id(), target_size).Do()
 				}
 
@@ -482,6 +559,14 @@ func resourceComputeInstanceGroupManagerDelete(apiLevel ApiLevel) func(d *schema
 				time.Sleep(2000 * time.Millisecond)
 				op, err = config.clientCompute.InstanceGroupManagers.Delete(project, zone, d.Id()).Do()
 			}
+		case BETA:
+			op, err = config.clientComputeBeta.InstanceGroupManagers.Delete(project, zone, d.Id()).Do()
+			attempt := 0
+			for err != nil && attempt < 20 {
+				attempt++
+				time.Sleep(2000 * time.Millisecond)
+				op, err = config.clientComputeBeta.InstanceGroupManagers.Delete(project, zone, d.Id()).Do()
+			}
 		}
 
 		if err != nil {
@@ -508,6 +593,14 @@ func resourceComputeInstanceGroupManagerDelete(apiLevel ApiLevel) func(d *schema
 				}
 
 				instanceGroupSize = instanceGroup.Size
+			case BETA:
+				instanceGroup, err := config.clientComputeBeta.InstanceGroups.Get(
+					project, d.Get("zone").(string), d.Id()).Do()
+				if err != nil {
+					return fmt.Errorf("Error getting instance group size: %s", err)
+				}
+
+				instanceGroupSize = instanceGroup.Size
 			}
 
 			if instanceGroupSize >= currentSize {
@@ -522,4 +615,52 @@ func resourceComputeInstanceGroupManagerDelete(apiLevel ApiLevel) func(d *schema
 		d.SetId("")
 		return nil
 	}
+}
+
+func getZonalResourceFromRegion(getResource func(string) (interface{}, error), region string, compute *compute.Service, project string) (interface{}, error) {
+	zoneList, err := compute.Zones.List(project).Do()
+	if err != nil {
+		return nil, err
+	}
+	var resource interface{}
+	for _, zone := range zoneList.Items {
+		if strings.Contains(zone.Name, region) {
+			resource, err = getResource(zone.Name)
+			if err != nil {
+				if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == 404 {
+					// Resource was not found in this zone
+					continue
+				}
+				return nil, fmt.Errorf("Error reading Resource: %s", err)
+			}
+			// Resource was found
+			return resource, nil
+		}
+	}
+	// Resource does not exist in this region
+	return nil, nil
+}
+
+func getZonalBetaResourceFromRegion(getResource func(string) (interface{}, error), region string, computeBeta *computeBeta.Service, project string) (interface{}, error) {
+	zoneList, err := computeBeta.Zones.List(project).Do()
+	if err != nil {
+		return nil, err
+	}
+	var resource interface{}
+	for _, zone := range zoneList.Items {
+		if strings.Contains(zone.Name, region) {
+			resource, err = getResource(zone.Name)
+			if err != nil {
+				if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == 404 {
+					// Resource was not found in this zone
+					continue
+				}
+				return nil, fmt.Errorf("Error reading Resource: %s", err)
+			}
+			// Resource was found
+			return resource, nil
+		}
+	}
+	// Resource does not exist in this region
+	return nil, nil
 }

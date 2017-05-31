@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/terraform/helper/mutexkv"
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/hashicorp/terraform/terraform"
-	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 )
 
@@ -185,30 +184,6 @@ func getProject(d *schema.ResourceData, config *Config) (string, error) {
 		return "", fmt.Errorf("%q: required field is not set", "project")
 	}
 	return res.(string), nil
-}
-
-func getZonalResourceFromRegion(getResource func(string) (interface{}, error), region string, compute *compute.Service, project string) (interface{}, error) {
-	zoneList, err := compute.Zones.List(project).Do()
-	if err != nil {
-		return nil, err
-	}
-	var resource interface{}
-	for _, zone := range zoneList.Items {
-		if strings.Contains(zone.Name, region) {
-			resource, err = getResource(zone.Name)
-			if err != nil {
-				if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == 404 {
-					// Resource was not found in this zone
-					continue
-				}
-				return nil, fmt.Errorf("Error reading Resource: %s", err)
-			}
-			// Resource was found
-			return resource, nil
-		}
-	}
-	// Resource does not exist in this region
-	return nil, nil
 }
 
 // getNetworkLink reads the "network" field from the given resource data and if the value:
