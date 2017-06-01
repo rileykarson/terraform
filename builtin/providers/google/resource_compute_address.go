@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/terraform/helper/schema"
 	"google.golang.org/api/compute/v1"
 	computeBeta "google.golang.org/api/compute/v0.beta"
-	computeShared "google.golang.org/api/compute/shared
+	computeShared "google.golang.org/api/compute/shared"
 	"k8s.io/kubernetes/pkg/api/meta"
 )
 
